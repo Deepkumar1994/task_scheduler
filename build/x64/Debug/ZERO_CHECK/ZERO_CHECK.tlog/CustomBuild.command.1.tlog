@@ -1,0 +1,10 @@
+^D:\EXPERIMENT_CODEX\TASK2\BUILD\CMAKEFILES\31631ECB7EE555FFA1C42436FD3818DB\GENERATE.STAMP.RULE
+setlocal
+"C:\Program Files\CMake\bin\cmake.exe" -SD:/experiment_codex/task2 -BD:/experiment_codex/task2/build --check-stamp-list CMakeFiles/generate.stamp.list --vs-solution-file D:/experiment_codex/task2/build/TaskScheduler.slnx
+if %errorlevel% neq 0 goto :cmEnd
+:cmEnd
+endlocal & call :cmErrorLevel %errorlevel% & goto :cmDone
+:cmErrorLevel
+exit /b %1
+:cmDone
+if %errorlevel% neq 0 goto :VCEnd
