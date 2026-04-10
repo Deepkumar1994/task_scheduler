@@ -11,6 +11,7 @@
 #include <queue>
 #include <thread>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace scheduler {
@@ -57,6 +58,7 @@ private:
     std::condition_variable all_done_;
     std::priority_queue<QueueEntry, std::vector<QueueEntry>, QueueCompare> queue_;
     std::unordered_map<std::uint64_t, JobPtr> jobs_;
+    std::unordered_set<std::uint64_t> submitted_job_ids_;
     std::vector<std::thread> workers_;
 };
 

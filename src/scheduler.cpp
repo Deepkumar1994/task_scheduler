@@ -30,6 +30,10 @@ Scheduler::~Scheduler() {
 JobPtr Scheduler::create_job(JobPriority priority, const std::string& description, Job::Task task) {
     std::lock_guard<std::mutex> lock(mutex_);
 
+    if (stopping_) {
+        throw std::runtime_error("Cannot create jobs after shutdown");
+    }
+
     auto job = std::make_shared<Job>(next_job_id_++, priority, description, std::move(task));
     jobs_[job->get_id()] = job;
     return job;
@@ -46,8 +50,17 @@ void Scheduler::submit(const JobPtr& job) {
             throw std::runtime_error("Cannot submit jobs after shutdown");
         }
 
+        const auto job_it = jobs_.find(job->get_id());
+        if (job_it == jobs_.end() || job_it->second != job) {
+            throw std::invalid_argument("Cannot submit a job that was not created by this scheduler");
+        }
+
+        if (submitted_job_ids_.contains(job->get_id())) {
+            throw std::runtime_error("Cannot submit the same job more than once");
+        }
+
         job->set_status(JobStatus::Pending);
-        jobs_[job->get_id()] = job;
+        submitted_job_ids_.insert(job->get_id());
         queue_.push(QueueEntry{job, next_sequence_++});
     }
 
@@ -102,6 +115,10 @@ std::vector<JobPtr> Scheduler::get_all_jobs() const {
         (void)id;
         result.push_back(job);
     }
+
+    std::sort(result.begin(), result.end(), [](const JobPtr& left, const JobPtr& right) {
+        return left->get_id() < right->get_id();
+    });
 
     return result;
 }
