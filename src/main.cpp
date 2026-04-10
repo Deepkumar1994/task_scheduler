@@ -1,3 +1,5 @@
+// Demonstrates priority-based scheduling and job status reporting.
+
 #include "scheduler/scheduler.hpp"
 
 #include <chrono>
@@ -5,7 +7,24 @@
 #include <mutex>
 #include <thread>
 
+namespace {
+
+void print_job_summary(const scheduler::Scheduler& scheduler) {
+    std::cout << "\nTracked job summary:\n";
+    for (const auto& job : scheduler.get_all_jobs()) {
+        std::cout
+            << "Job #" << job->get_id()
+            << " (" << job->get_description() << ")"
+            << " status: " << scheduler::to_string(job->get_status())
+            << '\n';
+    }
+}
+
+}  // namespace
+
 int main() {
+    using namespace std::chrono_literals;
+
     scheduler::Scheduler scheduler(3);
     std::mutex output_mutex;
 
@@ -17,7 +36,7 @@ int main() {
                 std::lock_guard<std::mutex> lock(output_mutex);
                 std::cout << "Starting nightly backup on worker " << std::this_thread::get_id() << '\n';
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(900));
+            std::this_thread::sleep_for(900ms);
         });
     const auto report_job = scheduler.create_job(
         scheduler::JobPriority::Medium,
@@ -27,7 +46,7 @@ int main() {
                 std::lock_guard<std::mutex> lock(output_mutex);
                 std::cout << "Generating report on worker " << std::this_thread::get_id() << '\n';
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(600));
+            std::this_thread::sleep_for(600ms);
         });
     const auto alert_job = scheduler.create_job(
         scheduler::JobPriority::High,
@@ -37,7 +56,7 @@ int main() {
                 std::lock_guard<std::mutex> lock(output_mutex);
                 std::cout << "Handling urgent alert on worker " << std::this_thread::get_id() << '\n';
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(300));
+            std::this_thread::sleep_for(300ms);
         });
     const auto cleanup_job = scheduler.create_job(
         scheduler::JobPriority::High,
@@ -47,7 +66,7 @@ int main() {
                 std::lock_guard<std::mutex> lock(output_mutex);
                 std::cout << "Cleaning temporary files on worker " << std::this_thread::get_id() << '\n';
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(500));
+            std::this_thread::sleep_for(500ms);
         });
 
     scheduler.submit(backup_job);
@@ -57,14 +76,7 @@ int main() {
 
     std::cout << "Submitting jobs to worker threads...\n";
     scheduler.wait_for_all();
-
-    std::cout << "\nTracked job summary:\n";
-    for (const auto& job : scheduler.get_all_jobs()) {
-        std::cout
-            << "Job #" << job->get_id()
-            << " status: " << scheduler::to_string(job->get_status())
-            << '\n';
-    }
+    print_job_summary(scheduler);
 
     return 0;
 }

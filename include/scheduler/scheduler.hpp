@@ -1,3 +1,5 @@
+// Declares a small priority-based task scheduler with tracked single-shot jobs.
+
 #pragma once
 
 #include "scheduler/job.hpp"
@@ -20,20 +22,30 @@ using JobPtr = std::shared_ptr<Job>;
 
 class Scheduler {
 public:
+    // Starts the worker pool immediately. A worker count of zero falls back to one worker.
     explicit Scheduler(std::size_t worker_count = std::thread::hardware_concurrency());
+    // Shuts the scheduler down and joins any worker threads that are still running.
     ~Scheduler();
 
     Scheduler(const Scheduler&) = delete;
     Scheduler& operator=(const Scheduler&) = delete;
 
+    // Creates a tracked job owned by this scheduler. Throws after shutdown.
     JobPtr create_job(JobPriority priority, const std::string& description, Job::Task task);
+    // Queues a job for execution. Each created job can be submitted exactly once.
     void submit(const JobPtr& job);
+    // Blocks until no queued or running jobs remain.
     void wait_for_all();
+    // Stops accepting new work and joins the worker pool after queued work finishes.
     void shutdown();
 
+    // Returns true when there is no queued or currently running work.
     [[nodiscard]] bool empty() const noexcept;
+    // Returns the number of jobs still waiting in the queue.
     [[nodiscard]] std::size_t pending_jobs() const noexcept;
+    // Returns every tracked job sorted by job ID for deterministic iteration.
     [[nodiscard]] std::vector<JobPtr> get_all_jobs() const;
+    // Finds a tracked job by ID.
     [[nodiscard]] std::optional<JobPtr> find_job(std::uint64_t id) const;
 
 private:
@@ -46,6 +58,7 @@ private:
         bool operator()(const QueueEntry& left, const QueueEntry& right) const;
     };
 
+    // Worker entry point that waits for available work and executes jobs.
     void worker_loop();
 
     std::uint64_t next_job_id_ {1};

@@ -1,9 +1,19 @@
+// Implements the small Job type used by the scheduler.
+
 #include "scheduler/job.hpp"
 
 #include <stdexcept>
+#include <string_view>
 #include <utility>
 
 namespace scheduler {
+namespace {
+
+std::string to_owned_string(std::string_view value) {
+    return std::string(value);
+}
+
+}  // namespace
 
 Job::Job(std::uint64_t id, JobPriority priority, std::string description, Task task)
     : id_(id),
@@ -45,29 +55,29 @@ void Job::set_status(JobStatus status) noexcept {
 std::string to_string(JobPriority priority) {
     switch (priority) {
     case JobPriority::Low:
-        return "Low";
+        return to_owned_string("Low");
     case JobPriority::Medium:
-        return "Medium";
+        return to_owned_string("Medium");
     case JobPriority::High:
-        return "High";
+        return to_owned_string("High");
     }
 
-    return "Unknown";
+    return to_owned_string("Unknown");
 }
 
 std::string to_string(JobStatus status) {
     switch (status) {
     case JobStatus::Pending:
-        return "Pending";
+        return to_owned_string("Pending");
     case JobStatus::Running:
-        return "Running";
+        return to_owned_string("Running");
     case JobStatus::Completed:
-        return "Completed";
+        return to_owned_string("Completed");
     case JobStatus::Failed:
-        return "Failed";
+        return to_owned_string("Failed");
     }
 
-    return "Unknown";
+    return to_owned_string("Unknown");
 }
 
 }  // namespace scheduler

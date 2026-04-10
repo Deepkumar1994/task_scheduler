@@ -1,10 +1,36 @@
+// Implements the scheduler's queue management, worker lifecycle, and job tracking.
+
 #include "scheduler/scheduler.hpp"
 
 #include <algorithm>
+#include <ranges>
 #include <stdexcept>
 #include <utility>
 
 namespace scheduler {
+namespace {
+
+void throw_if_stopping(bool stopping) {
+    if (stopping) {
+        throw std::runtime_error("Scheduler is shut down");
+    }
+}
+
+void validate_job_for_submission(
+    const JobPtr& job,
+    const std::unordered_map<std::uint64_t, JobPtr>& jobs,
+    const std::unordered_set<std::uint64_t>& submitted_job_ids) {
+    const auto job_it = jobs.find(job->get_id());
+    if (job_it == jobs.end() || job_it->second != job) {
+        throw std::invalid_argument("Cannot submit a job that was not created by this scheduler");
+    }
+
+    if (submitted_job_ids.contains(job->get_id())) {
+        throw std::runtime_error("Cannot submit the same job more than once");
+    }
+}
+
+}  // namespace
 
 bool Scheduler::QueueCompare::operator()(const QueueEntry& left, const QueueEntry& right) const {
     if (left.job->get_priority() == right.job->get_priority()) {
@@ -29,10 +55,7 @@ Scheduler::~Scheduler() {
 
 JobPtr Scheduler::create_job(JobPriority priority, const std::string& description, Job::Task task) {
     std::lock_guard<std::mutex> lock(mutex_);
-
-    if (stopping_) {
-        throw std::runtime_error("Cannot create jobs after shutdown");
-    }
+    throw_if_stopping(stopping_);
 
     auto job = std::make_shared<Job>(next_job_id_++, priority, description, std::move(task));
     jobs_[job->get_id()] = job;
@@ -46,18 +69,8 @@ void Scheduler::submit(const JobPtr& job) {
 
     {
         std::lock_guard<std::mutex> lock(mutex_);
-        if (stopping_) {
-            throw std::runtime_error("Cannot submit jobs after shutdown");
-        }
-
-        const auto job_it = jobs_.find(job->get_id());
-        if (job_it == jobs_.end() || job_it->second != job) {
-            throw std::invalid_argument("Cannot submit a job that was not created by this scheduler");
-        }
-
-        if (submitted_job_ids_.contains(job->get_id())) {
-            throw std::runtime_error("Cannot submit the same job more than once");
-        }
+        throw_if_stopping(stopping_);
+        validate_job_for_submission(job, jobs_, submitted_job_ids_);
 
         job->set_status(JobStatus::Pending);
         submitted_job_ids_.insert(job->get_id());
@@ -116,7 +129,7 @@ std::vector<JobPtr> Scheduler::get_all_jobs() const {
         result.push_back(job);
     }
 
-    std::sort(result.begin(), result.end(), [](const JobPtr& left, const JobPtr& right) {
+    std::ranges::sort(result, [](const JobPtr& left, const JobPtr& right) {
         return left->get_id() < right->get_id();
     });
 
@@ -154,6 +167,8 @@ void Scheduler::worker_loop() {
             ++active_jobs_;
         }
 
+        // Job status transitions are kept outside the scheduler mutex so a
+        // long-running task never blocks unrelated readers of scheduler state.
         job->set_status(JobStatus::Running);
 
         try {
